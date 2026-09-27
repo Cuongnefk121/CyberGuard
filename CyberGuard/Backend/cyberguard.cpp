@@ -1,6 +1,6 @@
 #ifdef _WIN32
 
-#define _WIN32_WINNT 0x0601
+#define _WIN32_WINNT 0x0600
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -9,6 +9,8 @@
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "winhttp.lib")
+
+typedef SOCKET socket_t;
 
 #else
 
@@ -19,7 +21,8 @@
 #include <unistd.h>
 #include <curl/curl.h>
 
-#define SOCKET int
+typedef int socket_t;
+
 #define INVALID_SOCKET (-1)
 #define SOCKET_ERROR (-1)
 
@@ -27,89 +30,267 @@
 
 #include <iostream>
 #include <string>
-#include <cstdlib>
+#include <vector>
 #include <cstring>
-#include <sstream>
+#include <cstdlib>
 
 #define ll long long
 
 using namespace std;
 
-const string VT_API_KEY =
-    "03982ccb3228d389f284ba569850736c2f340eddcc0b0e11be5460b9cb1ab3f4";
+
+/* =========================================
+   API KEY
+   ========================================= */
+
+string GetAPIKey()
+{
+    return "03982ccb3228d389f284ba569850736c2f340eddcc0b0e11be5460b9cb1ab3f4";
+}
+
+
+/* =========================================
+   PORT
+   ========================================= */
+
+int GetPort()
+{
+    const char* p = getenv("PORT");
+
+    if (p != NULL)
+    {
+        int port = atoi(p);
+
+        if (port > 0)
+            return port;
+    }
+
+    return 8080;
+}
+
+
+/* =========================================
+   URL DECODE
+   ========================================= */
+
+string UrlDecode(string s)
+{
+    string res = "";
+
+    for (int i = 0; i < (int)s.size(); i++)
+    {
+        if (
+            s[i] == '%' &&
+            i + 2 < (int)s.size()
+        )
+        {
+            char h1 = s[i + 1];
+            char h2 = s[i + 2];
+
+            int a = 0;
+            int b = 0;
+
+            if (h1 >= '0' && h1 <= '9')
+                a = h1 - '0';
+            else if (h1 >= 'A' && h1 <= 'F')
+                a = h1 - 'A' + 10;
+            else if (h1 >= 'a' && h1 <= 'f')
+                a = h1 - 'a' + 10;
+
+            if (h2 >= '0' && h2 <= '9')
+                b = h2 - '0';
+            else if (h2 >= 'A' && h2 <= 'F')
+                b = h2 - 'A' + 10;
+            else if (h2 >= 'a' && h2 <= 'f')
+                b = h2 - 'a' + 10;
+
+            res += (char)(a * 16 + b);
+
+            i += 2;
+        }
+        else if (s[i] == '+')
+        {
+            res += ' ';
+        }
+        else
+        {
+            res += s[i];
+        }
+    }
+
+    return res;
+}
+
+
+/* =========================================
+   GET MALICIOUS
+   ========================================= */
+
+int GetMalicious(string response)
+{
+    size_t statsPos =
+        response.find(
+            "\"last_analysis_stats\""
+        );
+
+    if (statsPos == string::npos)
+    {
+        cout << "[ERROR] last_analysis_stats not found."
+             << endl;
+
+        return -1;
+    }
+
+    size_t maliciousPos =
+        response.find(
+            "\"malicious\"",
+            statsPos
+        );
+
+    if (maliciousPos == string::npos)
+    {
+        cout << "[ERROR] malicious not found."
+             << endl;
+
+        return -1;
+    }
+
+    maliciousPos =
+        response.find(
+            ":",
+            maliciousPos
+        );
+
+    if (maliciousPos == string::npos)
+        return -1;
+
+    maliciousPos++;
+
+    while (
+        maliciousPos < response.size() &&
+        (
+            response[maliciousPos] == ' ' ||
+            response[maliciousPos] == '\t'
+        )
+    )
+    {
+        maliciousPos++;
+    }
+
+    int malicious = 0;
+
+    while (
+        maliciousPos < response.size() &&
+        response[maliciousPos] >= '0' &&
+        response[maliciousPos] <= '9'
+    )
+    {
+        malicious =
+            malicious * 10 +
+            (
+                response[maliciousPos] - '0'
+            );
+
+        maliciousPos++;
+    }
+
+    return malicious;
+}
+
 
 #ifdef _WIN32
 
-string vtRequest(string domain)
-{
-    HINTERNET hSession = WinHttpOpen(
-        L"CyberGuard/1.0",
-        WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-        WINHTTP_NO_PROXY_NAME,
-        WINHTTP_NO_PROXY_BYPASS,
-        0
-    );
 
-    if (!hSession)
-        return "";
+/* =========================================
+   VIRUSTOTAL - WINDOWS
+   ========================================= */
+
+int CheckVirusTotal(string domain)
+{
+    string apiKey =
+        GetAPIKey();
+
+    HINTERNET hSession =
+        WinHttpOpen(
+            L"CyberGuard",
+            WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+            WINHTTP_NO_PROXY_NAME,
+            WINHTTP_NO_PROXY_BYPASS,
+            0
+        );
+
+    if (hSession == NULL)
+        return -1;
+
+    HINTERNET hConnect =
+        WinHttpConnect(
+            hSession,
+            L"www.virustotal.com",
+            INTERNET_DEFAULT_HTTPS_PORT,
+            0
+        );
+
+    if (hConnect == NULL)
+    {
+        WinHttpCloseHandle(hSession);
+        return -1;
+    }
 
     string path =
-        "/api/v3/domains/" + domain;
+        "/api/v3/domains/" +
+        domain;
 
     wstring wpath(
         path.begin(),
         path.end()
     );
 
-    HINTERNET hConnect = WinHttpConnect(
-        hSession,
-        L"www.virustotal.com",
-        INTERNET_DEFAULT_HTTPS_PORT,
-        0
-    );
+    HINTERNET hRequest =
+        WinHttpOpenRequest(
+            hConnect,
+            L"GET",
+            wpath.c_str(),
+            NULL,
+            WINHTTP_NO_REFERER,
+            WINHTTP_DEFAULT_ACCEPT_TYPES,
+            WINHTTP_FLAG_SECURE
+        );
 
-    if (!hConnect)
-    {
-        WinHttpCloseHandle(hSession);
-        return "";
-    }
-
-    HINTERNET hRequest = WinHttpOpenRequest(
-        hConnect,
-        L"GET",
-        wpath.c_str(),
-        NULL,
-        WINHTTP_NO_REFERER,
-        WINHTTP_DEFAULT_ACCEPT_TYPES,
-        WINHTTP_FLAG_SECURE
-    );
-
-    if (!hRequest)
+    if (hRequest == NULL)
     {
         WinHttpCloseHandle(hConnect);
         WinHttpCloseHandle(hSession);
-        return "";
+
+        return -1;
     }
 
     string header =
-        "x-apikey: " + VT_API_KEY + "\r\n";
+        "x-apikey: " +
+        apiKey;
 
     wstring wheader(
         header.begin(),
         header.end()
     );
 
-    BOOL ok = WinHttpAddRequestHeaders(
-        hRequest,
-        wheader.c_str(),
-        -1,
-        WINHTTP_ADDREQ_FLAG_ADD
-    );
+    if (
+        !WinHttpAddRequestHeaders(
+            hRequest,
+            wheader.c_str(),
+            (DWORD)-1,
+            WINHTTP_ADDREQ_FLAG_ADD
+        )
+    )
+    {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
 
-    string result;
+        return -1;
+    }
 
-    if (ok &&
-        WinHttpSendRequest(
+    if (
+        !WinHttpSendRequest(
             hRequest,
             WINHTTP_NO_ADDITIONAL_HEADERS,
             0,
@@ -117,93 +298,134 @@ string vtRequest(string domain)
             0,
             0,
             0
-        ) &&
-        WinHttpReceiveResponse(
+        )
+    )
+    {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+
+        return -1;
+    }
+
+    if (
+        !WinHttpReceiveResponse(
             hRequest,
             NULL
-        ))
+        )
+    )
     {
-        DWORD size = 0;
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
 
-        do
+        return -1;
+    }
+
+    string response = "";
+
+    DWORD size = 0;
+
+    while (
+        WinHttpQueryDataAvailable(
+            hRequest,
+            &size
+        )
+    )
+    {
+        if (size == 0)
+            break;
+
+        vector<char> buffer(
+            size + 1
+        );
+
+        DWORD downloaded = 0;
+
+        if (
+            !WinHttpReadData(
+                hRequest,
+                &buffer[0],
+                size,
+                &downloaded
+            )
+        )
         {
-            if (!WinHttpQueryDataAvailable(
-                    hRequest,
-                    &size))
-                break;
+            break;
+        }
 
-            if (size == 0)
-                break;
+        buffer[downloaded] = '\0';
 
-            char *buffer =
-                new char[size + 1];
-
-            DWORD read = 0;
-
-            if (WinHttpReadData(
-                    hRequest,
-                    buffer,
-                    size,
-                    &read))
-            {
-                buffer[read] = '\0';
-                result += buffer;
-            }
-
-            delete[] buffer;
-
-        } while (size > 0);
+        response +=
+            &buffer[0];
     }
 
     WinHttpCloseHandle(hRequest);
     WinHttpCloseHandle(hConnect);
     WinHttpCloseHandle(hSession);
 
-    return result;
+    return GetMalicious(
+        response
+    );
 }
+
 
 #else
 
-size_t writeCallback(
-    void *contents,
+
+/* =========================================
+   CURL WRITE CALLBACK
+   ========================================= */
+
+size_t WriteCallback(
+    void* contents,
     size_t size,
     size_t nmemb,
-    void *userp
+    void* userp
 )
 {
     size_t total =
         size * nmemb;
 
-    string *result =
-        (string *)userp;
+    string* response =
+        (string*)userp;
 
-    result->append(
-        (char *)contents,
+    response->append(
+        (char*)contents,
         total
     );
 
     return total;
 }
 
-string vtRequest(string domain)
-{
-    CURL *curl =
-        curl_easy_init();
 
-    if (!curl)
-        return "";
+/* =========================================
+   VIRUSTOTAL - LINUX / RENDER
+   ========================================= */
+
+int CheckVirusTotal(string domain)
+{
+    string apiKey =
+        GetAPIKey();
 
     string url =
         "https://www.virustotal.com/api/v3/domains/" +
         domain;
 
-    string result;
+    CURL* curl =
+        curl_easy_init();
 
-    struct curl_slist *headers =
+    if (curl == NULL)
+        return -1;
+
+    string response = "";
+
+    struct curl_slist* headers =
         NULL;
 
     string apiHeader =
-        "x-apikey: " + VT_API_KEY;
+        "x-apikey: " +
+        apiKey;
 
     headers =
         curl_slist_append(
@@ -226,150 +448,58 @@ string vtRequest(string domain)
     curl_easy_setopt(
         curl,
         CURLOPT_WRITEFUNCTION,
-        writeCallback
+        WriteCallback
     );
 
     curl_easy_setopt(
         curl,
         CURLOPT_WRITEDATA,
-        &result
+        &response
     );
 
     curl_easy_setopt(
         curl,
         CURLOPT_TIMEOUT,
-        20L
+        30L
     );
 
-    CURLcode res =
-        curl_easy_perform(curl);
+    CURLcode result =
+        curl_easy_perform(
+            curl
+        );
 
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
+    curl_slist_free_all(
+        headers
+    );
 
-    if (res != CURLE_OK)
-        return "";
+    curl_easy_cleanup(
+        curl
+    );
 
-    return result;
+    if (
+        result !=
+        CURLE_OK
+    )
+    {
+        cout <<
+            "[ERROR] VirusTotal request failed: "
+            << curl_easy_strerror(result)
+            << endl;
+
+        return -1;
+    }
+
+    return GetMalicious(
+        response
+    );
 }
 
 #endif
 
-string getDomain(string url)
-{
-    size_t p =
-        url.find("domain=");
 
-    if (p == string::npos)
-        return "";
-
-    string domain =
-        url.substr(p + 7);
-
-    size_t end =
-        domain.find("&");
-
-    if (end != string::npos)
-        domain =
-            domain.substr(0, end);
-
-    return domain;
-}
-
-int getMalicious(string data)
-{
-    string key =
-        "\"malicious\":";
-
-    size_t p =
-        data.find(key);
-
-    if (p == string::npos)
-        return -1;
-
-    p += key.length();
-
-    while (
-        p < data.size() &&
-        (data[p] == ' ' ||
-         data[p] == '\t')
-    )
-    {
-        p++;
-    }
-
-    string number;
-
-    while (
-        p < data.size() &&
-        data[p] >= '0' &&
-        data[p] <= '9'
-    )
-    {
-        number += data[p];
-        p++;
-    }
-
-    if (number.empty())
-        return -1;
-
-    return atoi(number.c_str());
-}
-
-string makeResponse(
-    string domain,
-    int malicious
-)
-{
-    stringstream ss;
-
-    ss << "{"
-       << "\"domain\":\""
-       << domain
-       << "\","
-       << "\"malicious\":"
-       << malicious
-       << "}";
-
-    return ss.str();
-}
-
-void closeSocket(SOCKET s)
-{
-#ifdef _WIN32
-    closesocket(s);
-#else
-    close(s);
-#endif
-}
-
-bool sendAll(
-    SOCKET client,
-    string data
-)
-{
-    int sent = 0;
-    int total =
-        (int)data.size();
-
-    while (sent < total)
-    {
-        int n =
-            send(
-                client,
-                data.c_str() + sent,
-                total - sent,
-                0
-            );
-
-        if (n <= 0)
-            return false;
-
-        sent += n;
-    }
-
-    return true;
-}
+/* =========================================
+   MAIN SERVER
+   ========================================= */
 
 int main()
 {
@@ -377,18 +507,21 @@ int main()
 
     WSADATA wsa;
 
-    if (WSAStartup(
+    if (
+        WSAStartup(
             MAKEWORD(2, 2),
             &wsa
-        ) != 0)
+        ) != 0
+    )
     {
-        cout << "WSAStartup failed\n";
+        cout <<
+            "[ERROR] WSAStartup failed."
+            << endl;
+
         return 1;
     }
 
-#endif
-
-#ifndef _WIN32
+#else
 
     curl_global_init(
         CURL_GLOBAL_DEFAULT
@@ -396,15 +529,16 @@ int main()
 
 #endif
 
-    const char *portEnv =
-        getenv("PORT");
 
-    int port = 8080;
+    int port =
+        GetPort();
 
-    if (portEnv != NULL)
-        port = atoi(portEnv);
 
-    SOCKET server =
+    /* =====================================
+       CREATE SOCKET
+       ===================================== */
+
+    socket_t server =
         socket(
             AF_INET,
             SOCK_STREAM,
@@ -413,9 +547,23 @@ int main()
 
     if (server == INVALID_SOCKET)
     {
-        cout << "Cannot create socket\n";
+        cout <<
+            "[ERROR] Cannot create socket."
+            << endl;
+
+#ifdef _WIN32
+        WSACleanup();
+#else
+        curl_global_cleanup();
+#endif
+
         return 1;
     }
+
+
+    /* =====================================
+       REUSE PORT
+       ===================================== */
 
     int opt = 1;
 
@@ -423,87 +571,154 @@ int main()
         server,
         SOL_SOCKET,
         SO_REUSEADDR,
-        (char *)&opt,
+        (char*)&opt,
         sizeof(opt)
     );
 
-    sockaddr_in address;
+
+    /* =====================================
+       SERVER ADDRESS
+       ===================================== */
+
+    sockaddr_in serverAddr;
 
     memset(
-        &address,
+        &serverAddr,
         0,
-        sizeof(address)
+        sizeof(serverAddr)
     );
 
-    address.sin_family =
+    serverAddr.sin_family =
         AF_INET;
 
-    address.sin_addr.s_addr =
-        htonl(INADDR_ANY);
+    serverAddr.sin_addr.s_addr =
+        INADDR_ANY;
 
-    address.sin_port =
+    serverAddr.sin_port =
         htons(port);
 
-    if (bind(
+
+    /* =====================================
+       BIND
+       ===================================== */
+
+    if (
+        bind(
             server,
-            (sockaddr *)&address,
-            sizeof(address)
-        ) == SOCKET_ERROR)
+            (sockaddr*)&serverAddr,
+            sizeof(serverAddr)
+        ) == SOCKET_ERROR
+    )
     {
-        cout << "Bind failed\n";
-
-        closeSocket(server);
+        cout <<
+            "[ERROR] Bind failed."
+            << endl;
 
 #ifdef _WIN32
+        closesocket(server);
         WSACleanup();
 #else
+        close(server);
         curl_global_cleanup();
 #endif
 
         return 1;
     }
 
-    if (listen(server, 20)
-        == SOCKET_ERROR)
-    {
-        cout << "Listen failed\n";
 
-        closeSocket(server);
+    /* =====================================
+       LISTEN
+       ===================================== */
+
+    if (
+        listen(
+            server,
+            10
+        ) == SOCKET_ERROR
+    )
+    {
+        cout <<
+            "[ERROR] Listen failed."
+            << endl;
 
 #ifdef _WIN32
+        closesocket(server);
         WSACleanup();
 #else
+        close(server);
         curl_global_cleanup();
 #endif
 
         return 1;
     }
+
 
     cout <<
-        "CyberGuard Backend running on port "
-        << port << "\n";
+        "===================================="
+        << endl;
+
+    cout <<
+        "        CYBERGUARD BACKEND"
+        << endl;
+
+    cout <<
+        "===================================="
+        << endl;
+
+    cout <<
+        "Server running on port "
+        << port
+        << endl;
+
+    cout <<
+        "Endpoint:"
+        << endl;
+
+    cout <<
+        "/scan?domain=example.com"
+        << endl;
+
+    cout <<
+        "===================================="
+        << endl;
+
+
+    /* =====================================
+       SERVER LOOP
+       ===================================== */
 
     while (true)
     {
-        sockaddr_in clientAddress;
+        sockaddr_in clientAddr;
 
 #ifdef _WIN32
-        int clientSize =
-            sizeof(clientAddress);
+
+        int clientLen =
+            sizeof(clientAddr);
+
 #else
-        socklen_t clientSize =
-            sizeof(clientAddress);
+
+        socklen_t clientLen =
+            sizeof(clientAddr);
+
 #endif
 
-        SOCKET client =
+        socket_t client =
             accept(
                 server,
-                (sockaddr *)&clientAddress,
-                &clientSize
+                (sockaddr*)&clientAddr,
+                &clientLen
             );
 
         if (client == INVALID_SOCKET)
+        {
             continue;
+        }
+
+
+        /* =================================
+           RECEIVE REQUEST
+           ================================= */
 
         char buffer[8192];
 
@@ -513,6 +728,8 @@ int main()
             sizeof(buffer)
         );
 
+#ifdef _WIN32
+
         int received =
             recv(
                 client,
@@ -521,128 +738,282 @@ int main()
                 0
             );
 
+#else
+
+        int received =
+            recv(
+                client,
+                buffer,
+                sizeof(buffer) - 1,
+                0
+            );
+
+#endif
+
         if (received <= 0)
         {
-            closeSocket(client);
+#ifdef _WIN32
+            closesocket(client);
+#else
+            close(client);
+#endif
+
             continue;
         }
 
-        string request(
-            buffer,
-            received
-        );
+        string request =
+            string(
+                buffer,
+                received
+            );
+
+
+        cout <<
+            "[REQUEST] "
+            << request.substr(
+                0,
+                request.find("\r\n")
+            )
+            << endl;
+
+
+        /* =================================
+           CORS
+           ================================= */
+
+        string responseBody;
+
+
+        /* =================================
+           CHECK OPTIONS
+           ================================= */
 
         if (
             request.find(
-                "GET /scan?domain="
-            ) == string::npos
+                "OPTIONS"
+            ) == 0
         )
         {
-            string body =
-                "{\"error\":\"Invalid endpoint\"}";
-
-            string response =
-                "HTTP/1.1 404 Not Found\r\n"
-                "Content-Type: application/json\r\n"
-                "Access-Control-Allow-Origin: *\r\n"
-                "Content-Length: " +
-                to_string(body.size()) +
-                "\r\n\r\n" +
-                body;
-
-            sendAll(
-                client,
-                response
-            );
-
-            closeSocket(client);
-            continue;
-        }
-
-        size_t start =
-            request.find(
-                "GET /scan?domain="
-            );
-
-        start +=
-            strlen("GET /scan?domain=");
-
-        size_t end =
-            request.find(
-                " ",
-                start
-            );
-
-        string domain =
-            request.substr(
-                start,
-                end - start
-            );
-
-        size_t amp =
-            domain.find("&");
-
-        if (amp != string::npos)
-            domain =
-                domain.substr(
-                    0,
-                    amp
-                );
-
-        cout <<
-            "Scanning: "
-            << domain
-            << "\n";
-
-        string vt =
-            vtRequest(domain);
-
-        int malicious =
-            getMalicious(vt);
-
-        string body;
-
-        if (malicious < 0)
-        {
-            body =
-                "{\"error\":\"VirusTotal request failed\"}";
+            responseBody =
+                "";
         }
         else
         {
-            body =
-                makeResponse(
-                    domain,
-                    malicious
+            /* =============================
+               GET /scan?domain=
+               ============================= */
+
+            size_t scanPos =
+                request.find(
+                    "GET /scan?domain="
                 );
+
+            if (
+                scanPos == string::npos
+            )
+            {
+                responseBody =
+                    "{\"error\":\"Invalid endpoint\"}";
+            }
+            else
+            {
+                size_t start =
+                    scanPos +
+                    strlen(
+                        "GET /scan?domain="
+                    );
+
+                size_t end =
+                    request.find(
+                        " ",
+                        start
+                    );
+
+                if (
+                    end == string::npos
+                )
+                {
+                    responseBody =
+                        "{\"error\":\"Invalid request\"}";
+                }
+                else
+                {
+                    string domain =
+                        request.substr(
+                            start,
+                            end - start
+                        );
+
+                    domain =
+                        UrlDecode(
+                            domain
+                        );
+
+
+                    /* =====================
+                       REMOVE EXTRA QUERY
+                       ===================== */
+
+                    size_t q =
+                        domain.find(
+                            "&"
+                        );
+
+                    if (
+                        q != string::npos
+                    )
+                    {
+                        domain =
+                            domain.substr(
+                                0,
+                                q
+                            );
+                    }
+
+
+                    /* =====================
+                       REMOVE PATH
+                       ===================== */
+
+                    q =
+                        domain.find(
+                            "/"
+                        );
+
+                    if (
+                        q != string::npos
+                    )
+                    {
+                        domain =
+                            domain.substr(
+                                0,
+                                q
+                            );
+                    }
+
+
+                    cout <<
+                        "[SCAN] "
+                        << domain
+                        << endl;
+
+
+                    /* =====================
+                       CHECK DOMAIN
+                       ===================== */
+
+                    int malicious =
+                        CheckVirusTotal(
+                            domain
+                        );
+
+
+                    if (
+                        malicious < 0
+                    )
+                    {
+                        responseBody =
+                            "{\"error\":\"VirusTotal request failed\"}";
+                    }
+                    else
+                    {
+                        cout <<
+                            "[RESULT] "
+                            << domain
+                            << " -> malicious = "
+                            << malicious
+                            << endl;
+
+
+                        /* =================
+                           CYBERGUARD RULE
+                           ================= */
+
+                        if (
+                            malicious >= 3
+                        )
+                        {
+                            cout <<
+                                "[WARNING] "
+                                << domain
+                                << " is potentially dangerous."
+                                << endl;
+                        }
+                        else
+                        {
+                            cout <<
+                                "[SAFE] "
+                                << domain
+                                << endl;
+                        }
+
+
+                        responseBody =
+                            "{\"domain\":\"" +
+                            domain +
+                            "\",\"malicious\":" +
+                            to_string(
+                                malicious
+                            ) +
+                            "}";
+                    }
+                }
+            }
         }
 
-        string response =
+
+        /* =================================
+           HTTP RESPONSE
+           ================================= */
+
+        string httpResponse =
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: application/json\r\n"
             "Access-Control-Allow-Origin: *\r\n"
-            "Access-Control-Allow-Methods: GET\r\n"
+            "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
+            "Access-Control-Allow-Headers: *\r\n"
             "Content-Length: " +
-            to_string(body.size()) +
+            to_string(
+                responseBody.size()
+            ) +
             "\r\n"
             "Connection: close\r\n"
             "\r\n" +
-            body;
+            responseBody;
 
-        sendAll(
+
+        send(
             client,
-            response
+            httpResponse.c_str(),
+            (int)httpResponse.size(),
+            0
         );
 
-        closeSocket(client);
-    }
-
-    closeSocket(server);
 
 #ifdef _WIN32
 
+        closesocket(client);
+
+#else
+
+        close(client);
+
+#endif
+    }
+
+
+    /* =====================================
+       CLEANUP
+       ===================================== */
+
+#ifdef _WIN32
+
+    closesocket(server);
     WSACleanup();
 
 #else
+
+    close(server);
 
     curl_global_cleanup();
 
