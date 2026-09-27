@@ -1,30 +1,34 @@
 const BACKEND =
     "https://cyberguard-jx83.onrender.com/scan?domain=";
 
-
 const params =
     new URLSearchParams(
         window.location.search
     );
 
-
 const originalUrl =
     params.get("url");
-
 
 const status =
     document.getElementById("status");
 
-
 const result =
     document.getElementById("result");
-
 
 function getDomain(url)
 {
     try
     {
-        return new URL(url).hostname;
+        let domain =
+            new URL(url).hostname;
+
+        domain =
+            domain.replace(
+                /^www\./,
+                ""
+            );
+
+        return domain;
     }
     catch (e)
     {
@@ -32,54 +36,48 @@ function getDomain(url)
     }
 }
 
-
 async function checkWebsite()
 {
     if (!originalUrl)
     {
-        if (status)
-        {
-            status.innerText =
-                "Không tìm thấy website.";
-        }
-
+        status.innerText =
+            "Không tìm thấy website.";
         return;
     }
-
 
     let domain =
         getDomain(originalUrl);
 
-
     if (!domain)
     {
-        if (status)
-        {
-            status.innerText =
-                "Không thể xác định tên miền.";
-        }
-
+        status.innerText =
+            "Không thể xác định tên miền.";
         return;
     }
 
-
-    if (status)
-    {
-        status.innerText =
-            "Đang kiểm tra " +
-            domain +
-            "...";
-    }
-
+    status.innerText =
+        "Đang kiểm tra " +
+        domain +
+        "...";
 
     try
     {
-        let response =
-            await fetch(
-                BACKEND +
-                encodeURIComponent(domain)
-            );
+        let url =
+            BACKEND +
+            encodeURIComponent(domain);
 
+        console.log(
+            "CyberGuard request:",
+            url
+        );
+
+        let response =
+            await fetch(url);
+
+        console.log(
+            "HTTP:",
+            response.status
+        );
 
         if (!response.ok)
         {
@@ -89,41 +87,23 @@ async function checkWebsite()
             );
         }
 
-
         let data =
             await response.json();
 
-
-        let malicious =
-            Number(
-                data.malicious
-            );
-
-
-        if (
-            Number.isNaN(
-                malicious
-            )
-        )
-        {
-            throw new Error(
-                "Kết quả không hợp lệ"
-            );
-        }
-
-
         console.log(
-            "CyberGuard:",
-            domain,
-            "malicious =",
-            malicious
+            "CyberGuard response:",
+            data
         );
 
+        let malicious =
+            Number(data.malicious);
 
-        /*
-         * >= 3:
-         * Hiển thị cảnh báo
-         */
+        if (Number.isNaN(malicious))
+        {
+            throw new Error(
+                "Invalid malicious value"
+            );
+        }
 
         if (malicious >= 3)
         {
@@ -142,34 +122,19 @@ async function checkWebsite()
                 "&malicious=" +
                 malicious;
 
-
             window.location.href =
                 warningUrl;
 
             return;
         }
 
+        status.innerText =
+            "Website chưa bị phát hiện nguy hiểm.";
 
-        /*
-         * Website an toàn /
-         * chưa đủ mức cảnh báo
-         */
-
-        if (status)
-        {
-            status.innerText =
-                "Website chưa bị phát hiện nguy hiểm.";
-        }
-
-
-        if (result)
-        {
-            result.innerText =
-                "VirusTotal phát hiện: " +
-                malicious +
-                " engine.";
-        }
-
+        result.innerText =
+            "VirusTotal phát hiện: " +
+            malicious +
+            " engine.";
 
         setTimeout(
             function()
@@ -183,25 +148,16 @@ async function checkWebsite()
     catch (error)
     {
         console.error(
-            "CyberGuard error:",
+            "CyberGuard ERROR:",
             error
         );
 
+        status.innerText =
+            "⚠️ Cannot connect to CyberGuard Backend.";
 
-        if (status)
-        {
-            status.innerText =
-                "Không thể kết nối CyberGuard.";
-        }
-
-
-        if (result)
-        {
-            result.innerText =
-                "Backend có thể đang khởi động. Vui lòng thử lại.";
-        }
+        result.innerText =
+            error.message;
     }
 }
-
 
 checkWebsite();
