@@ -1,195 +1,255 @@
 <!DOCTYPE html>
-
-<html>
+<html lang="vi">
 
 <head>
-
     <meta charset="UTF-8">
 
-    <title>
-        CyberGuard Warning
-    </title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
 
+    <title>CyberGuard - Cảnh báo</title>
 
     <style>
-
-        body
-        {
+        * {
+            box-sizing: border-box;
             margin: 0;
+            padding: 0;
+        }
 
+        body {
             min-height: 100vh;
 
-            background: #101010;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background:
+                radial-gradient(
+                    circle at center,
+                    #32120f,
+                    #090607 65%
+                );
 
             color: white;
 
-            font-family: Arial;
+            font-family: Arial, sans-serif;
 
-            display: flex;
-
-            justify-content: center;
-
-            align-items: center;
+            padding: 20px;
         }
 
+        .box {
+            width: 100%;
+            max-width: 700px;
 
-        .box
-        {
-            width: 600px;
-
-            padding: 40px;
-
-            background: #1d1d1d;
-
-            border-radius: 15px;
+            padding: 45px 35px;
 
             text-align: center;
+
+            background: #110d0d;
+
+            border: 1px solid #6b2924;
+
+            border-radius: 20px;
+
+            box-shadow:
+                0 0 45px rgba(
+                    255,
+                    60,
+                    40,
+                    0.15
+                );
         }
 
+        .warning-icon {
+            font-size: 75px;
 
-        .shield
-        {
-            font-size: 70px;
+            margin-bottom: 15px;
         }
 
+        h1 {
+            color: #ff6257;
 
-        h1
-        {
-            font-size: 32px;
+            font-size: 38px;
+
+            margin-bottom: 15px;
         }
 
+        .subtitle {
+            color: #d6c6c4;
 
-        .danger
-        {
-            font-size: 23px;
+            font-size: 18px;
 
-            margin: 20px;
+            margin-bottom: 25px;
         }
 
+        .domain-box {
+            padding: 18px;
 
-        .domain
-        {
-            padding: 15px;
+            background: #090707;
 
-            background: #292929;
+            border-radius: 10px;
 
-            border-radius: 8px;
-
-            word-break: break-all;
+            border: 1px solid #47201d;
 
             margin: 20px 0;
         }
 
+        #domain {
+            color: #ff8077;
 
-        .count
-        {
-            font-size: 20px;
+            font-size: 18px;
 
-            margin: 20px;
+            word-break: break-all;
         }
 
+        .detection {
+            margin: 20px 0;
 
-        button
-        {
-            padding: 13px 25px;
+            padding: 15px;
 
-            margin: 8px;
+            background: #261210;
 
+            border-radius: 10px;
+
+            color: #ffb3ad;
+        }
+
+        #malicious {
+            font-size: 25px;
+
+            color: #ff6257;
+
+            font-weight: bold;
+        }
+
+        .buttons {
+            display: flex;
+
+            justify-content: center;
+
+            gap: 15px;
+
+            margin-top: 30px;
+
+            flex-wrap: wrap;
+        }
+
+        button {
             border: none;
 
-            border-radius: 7px;
+            padding: 14px 24px;
+
+            border-radius: 8px;
+
+            font-size: 15px;
+
+            font-weight: bold;
 
             cursor: pointer;
 
-            font-size: 16px;
+            transition: 0.25s;
         }
 
-
-        #back
-        {
-            background: #555;
+        #back {
+            background: #ff6257;
 
             color: white;
         }
 
+        #back:hover {
+            transform: translateY(-2px);
 
-        #continue
-        {
-            background: #8b0000;
+            background: #ff4437;
+        }
+
+        #continue {
+            background: transparent;
+
+            color: #c7b7b5;
+
+            border: 1px solid #67403b;
+        }
+
+        #continue:hover {
+            background: #241614;
 
             color: white;
         }
 
+        .note {
+            margin-top: 25px;
+
+            color: #806f6c;
+
+            font-size: 13px;
+        }
     </style>
-
 </head>
-
 
 <body>
 
+    <div class="box">
 
-<div class="box">
+        <div class="warning-icon">
+            ⚠️
+        </div>
 
+        <h1>
+            Cảnh báo bảo mật
+        </h1>
 
-    <div class="shield">
-        🛡️
+        <p class="subtitle">
+            CyberGuard phát hiện dấu hiệu đáng ngờ
+            trên website này.
+        </p>
+
+        <div class="domain-box">
+
+            <div>
+                Website:
+            </div>
+
+            <strong id="domain">
+                Đang tải...
+            </strong>
+
+        </div>
+
+        <div class="detection">
+
+            VirusTotal phát hiện:
+
+            <div>
+                <span id="malicious">
+                    0
+                </span>
+
+                engine có kết quả
+                <strong>malicious</strong>.
+            </div>
+
+        </div>
+
+        <div class="buttons">
+
+            <button id="back">
+                ← Quay lại
+            </button>
+
+            <button id="continue">
+                Tôi hiểu, tiếp tục
+            </button>
+
+        </div>
+
+        <div class="note">
+            Chỉ tiếp tục nếu bạn tin tưởng website này.
+        </div>
+
     </div>
 
 
-    <h1>
-        CYBERGUARD
-    </h1>
-
-
-    <div class="danger">
-        ⚠️ POTENTIALLY DANGEROUS WEBSITE
-    </div>
-
-
-    <p>
-        CyberGuard detected multiple security
-        engines flagging this website.
-    </p>
-
-
-    <div
-        class="domain"
-        id="domain">
-
-        Loading...
-
-    </div>
-
-
-    <div
-        class="count"
-        id="count">
-
-        Malicious detections: ...
-
-    </div>
-
-
-    <p>
-        We recommend leaving this website.
-    </p>
-
-
-    <button id="back">
-        Go Back
-    </button>
-
-
-    <button id="continue">
-        I Understand, Continue
-    </button>
-
-
-</div>
-
-
-<script src="warning.js"></script>
-
+    <script src="warning.js"></script>
 
 </body>
 
