@@ -18,12 +18,22 @@ chrome.webNavigation.onBeforeNavigate.addListener(
             return;
         }
 
-        if (bypassTabs[details.tabId] === url)
+        /*
+         * Nếu URL này đã được CyberGuard
+         * cho phép thì không kiểm tra lại.
+         */
+        if (
+            bypassTabs[details.tabId] === url
+        )
         {
             delete bypassTabs[details.tabId];
             return;
         }
 
+        /*
+         * Chuyển website sang trang
+         * kiểm tra của CyberGuard.
+         */
         let checkUrl =
             chrome.runtime.getURL(
                 "check.html"
@@ -41,8 +51,16 @@ chrome.webNavigation.onBeforeNavigate.addListener(
 );
 
 
+/*
+ * Nhận yêu cầu từ warning.js
+ * hoặc các trang khác.
+ */
 chrome.runtime.onMessage.addListener(
-    function(message, sender, sendResponse)
+    function(
+        message,
+        sender,
+        sendResponse
+    )
     {
         if (
             message.action ===
@@ -54,7 +72,10 @@ chrome.runtime.onMessage.addListener(
                     ? sender.tab.id
                     : message.tabId;
 
-            if (tabId !== undefined)
+            if (
+                tabId !== undefined &&
+                message.url
+            )
             {
                 bypassTabs[tabId] =
                     message.url;
@@ -70,6 +91,9 @@ chrome.runtime.onMessage.addListener(
 );
 
 
+/*
+ * Xóa dữ liệu khi đóng tab.
+ */
 chrome.tabs.onRemoved.addListener(
     function(tabId)
     {
