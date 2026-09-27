@@ -4,6 +4,10 @@ const params =
     );
 
 
+const originalUrl =
+    params.get("url");
+
+
 const domain =
     params.get("domain");
 
@@ -12,93 +16,88 @@ const malicious =
     params.get("malicious");
 
 
-const originalURL =
-    params.get("url");
+const domainElement =
+    document.getElementById(
+        "domain"
+    );
 
 
-/*
-    Hiển thị domain
-*/
-
-document.getElementById(
-    "domain"
-).innerText =
-    domain || "Unknown";
+const maliciousElement =
+    document.getElementById(
+        "malicious"
+    );
 
 
-/*
-    Hiển thị số malicious
-*/
-
-document.getElementById(
-    "count"
-).innerText =
-    "Malicious detections: " +
-    (malicious || "Unknown");
+const backButton =
+    document.getElementById(
+        "back"
+    );
 
 
-/*
-    =========================
-    GO BACK
-    =========================
-*/
-
-document.getElementById(
-    "back"
-).addEventListener(
-    "click",
-    function()
-    {
-        history.back();
-    }
-);
+const continueButton =
+    document.getElementById(
+        "continue"
+    );
 
 
-/*
-    =========================
-    CONTINUE
-    =========================
-*/
+if (domainElement)
+{
+    domainElement.innerText =
+        domain || "Unknown";
+}
 
-document.getElementById(
-    "continue"
-).addEventListener(
-    "click",
-    function()
-    {
-        if (!originalURL)
+
+if (maliciousElement)
+{
+    maliciousElement.innerText =
+        malicious || "0";
+}
+
+
+/* =========================
+   BACK
+========================= */
+
+if (backButton)
+{
+    backButton.addEventListener(
+        "click",
+        function()
         {
-            history.back();
-
-            return;
+            window.history.back();
         }
+    );
+}
 
 
-        /*
-            Chỉ cho phép URL này
-            trong tab hiện tại đi qua 1 lần.
-        */
+/* =========================
+   CONTINUE
+========================= */
 
-        chrome.runtime.sendMessage(
-            {
-                type:
-                    "ALLOW_CURRENT_URL",
+if (continueButton)
+{
+    continueButton.addEventListener(
+        "click",
+        function()
+        {
+            if (!originalUrl)
+                return;
 
-                url:
-                    originalURL
-            },
-            function()
-            {
-                /*
-                    Sau khi background
-                    lưu quyền bypass,
-                    mới mở website.
-                */
 
-                window.location.replace(
-                    originalURL
-                );
-            }
-        );
-    }
-);
+            chrome.runtime.sendMessage(
+                {
+                    action:
+                        "ALLOW_CURRENT_URL",
+
+                    url:
+                        originalUrl
+                },
+                function()
+                {
+                    window.location.href =
+                        originalUrl;
+                }
+            );
+        }
+    );
+}
