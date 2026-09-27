@@ -15,6 +15,7 @@ const status =
 const result =
     document.getElementById("result");
 
+
 function getDomain(url)
 {
     try
@@ -36,37 +37,56 @@ function getDomain(url)
     }
 }
 
+
 async function checkWebsite()
 {
     if (!originalUrl)
     {
-        status.innerText =
-            "Không tìm thấy website.";
+        if (status)
+        {
+            status.innerText =
+                "Không tìm thấy website.";
+        }
+
         return;
     }
+
 
     let domain =
         getDomain(originalUrl);
 
+
     if (!domain)
     {
-        status.innerText =
-            "Không thể xác định tên miền.";
+        if (status)
+        {
+            status.innerText =
+                "Không thể xác định tên miền.";
+        }
+
         return;
     }
 
-    status.innerText =
-        "Đang kiểm tra " +
-        domain +
-        "...";
+
+    if (status)
+    {
+        status.innerText =
+            "Đang kiểm tra " +
+            domain +
+            "...";
+    }
+
 
     try
     {
         let response =
             await fetch(
                 BACKEND +
-                encodeURIComponent(domain)
+                encodeURIComponent(
+                    domain
+                )
             );
+
 
         if (!response.ok)
         {
@@ -76,11 +96,16 @@ async function checkWebsite()
             );
         }
 
+
         let data =
             await response.json();
 
+
         let malicious =
-            Number(data.malicious);
+            Number(
+                data.malicious
+            );
+
 
         if (Number.isNaN(malicious))
         {
@@ -89,12 +114,18 @@ async function checkWebsite()
             );
         }
 
+
         console.log(
             "CyberGuard:",
             domain,
+            "malicious =",
             malicious
         );
 
+
+        /*
+         * Website nguy hiểm
+         */
         if (malicious >= 3)
         {
             let warningUrl =
@@ -112,31 +143,65 @@ async function checkWebsite()
                 "&malicious=" +
                 malicious;
 
+
             window.location.replace(
                 warningUrl
             );
 
+
             return;
         }
 
-        status.innerText =
-            "Website chưa bị phát hiện nguy hiểm.";
-
-        result.innerText =
-            "VirusTotal phát hiện: " +
-            malicious +
-            " engine.";
 
         /*
-         * Chờ một chút để người dùng
-         * nhìn thấy kết quả rồi quay lại
-         * website ban đầu.
+         * Website an toàn
+         */
+        if (status)
+        {
+            status.innerText =
+                "Website chưa bị phát hiện nguy hiểm.";
+        }
+
+
+        if (result)
+        {
+            result.innerText =
+                "VirusTotal phát hiện: " +
+                malicious +
+                " engine.";
+        }
+
+
+        /*
+         * Đợi 1.5 giây để hiển thị kết quả
          */
         setTimeout(
             function()
             {
-                window.location.replace(
-                    originalUrl
+                /*
+                 * Báo cho background.js:
+                 * URL này đã được kiểm tra,
+                 * cho phép truy cập lần này.
+                 */
+                chrome.runtime.sendMessage(
+                    {
+                        action:
+                            "ALLOW_CURRENT_URL",
+
+                        url:
+                            originalUrl
+                    },
+                    function()
+                    {
+                        /*
+                         * Sau khi background.js
+                         * nhận được lệnh bypass,
+                         * quay lại website.
+                         */
+                        window.location.replace(
+                            originalUrl
+                        );
+                    }
                 );
             },
             1500
@@ -149,12 +214,21 @@ async function checkWebsite()
             error
         );
 
-        status.innerText =
-            "⚠️ Cannot connect to CyberGuard Backend.";
 
-        result.innerText =
-            error.message;
+        if (status)
+        {
+            status.innerText =
+                "⚠️ Cannot connect to CyberGuard Backend.";
+        }
+
+
+        if (result)
+        {
+            result.innerText =
+                error.message;
+        }
     }
 }
+
 
 checkWebsite();
