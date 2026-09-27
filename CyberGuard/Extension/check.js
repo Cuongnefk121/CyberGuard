@@ -1,80 +1,79 @@
+const BACKEND =
+    "https://cyberguard-jx83.onrender.com/scan?domain=";
+
+
 const params =
     new URLSearchParams(
         window.location.search
     );
 
 
-const originalURL =
+const originalUrl =
     params.get("url");
 
 
 const status =
-    document.getElementById(
-        "status"
-    );
+    document.getElementById("status");
 
 
-const domainBox =
-    document.getElementById(
-        "domain"
-    );
+const result =
+    document.getElementById("result");
 
 
-const BACKEND =
-    "http://127.0.0.1:8080/scan?domain=";
-
-
-/*
-    Kiểm tra URL
-*/
-
-if (!originalURL)
-{
-    status.innerText =
-        "Cannot determine website.";
-}
-else
-{
-    checkWebsite();
-}
-
-
-/*
-    Hàm kiểm tra website
-*/
-
-async function checkWebsite()
+function getDomain(url)
 {
     try
     {
-        let site =
-            new URL(
-                originalURL
-            );
+        return new URL(url).hostname;
+    }
+    catch (e)
+    {
+        return "";
+    }
+}
 
 
-        let domain =
-            site.hostname;
+async function checkWebsite()
+{
+    if (!originalUrl)
+    {
+        if (status)
+        {
+            status.innerText =
+                "Không tìm thấy website.";
+        }
+
+        return;
+    }
 
 
-        domainBox.innerText =
-            domain;
+    let domain =
+        getDomain(originalUrl);
 
 
+    if (!domain)
+    {
+        if (status)
+        {
+            status.innerText =
+                "Không thể xác định tên miền.";
+        }
+
+        return;
+    }
+
+
+    if (status)
+    {
         status.innerText =
-            "🔎 Checking with CyberGuard...";
+            "Đang kiểm tra " +
+            domain +
+            "...";
+    }
 
 
-        console.log(
-            "[CyberGuard] Checking:",
-            domain
-        );
-
-
-        /*
-            Gửi domain cho C++ Backend
-        */
-
+    try
+    {
         let response =
             await fetch(
                 BACKEND +
@@ -84,29 +83,15 @@ async function checkWebsite()
 
         if (!response.ok)
         {
-            status.innerText =
-                "⚠️ CyberGuard Backend unavailable.";
-
-            return;
+            throw new Error(
+                "HTTP " +
+                response.status
+            );
         }
 
 
         let data =
             await response.json();
-
-
-        /*
-            Backend báo lỗi
-        */
-
-        if (data.error)
-        {
-            status.innerText =
-                "⚠️ " +
-                data.error;
-
-            return;
-        }
 
 
         let malicious =
@@ -115,8 +100,20 @@ async function checkWebsite()
             );
 
 
+        if (
+            Number.isNaN(
+                malicious
+            )
+        )
+        {
+            throw new Error(
+                "Kết quả không hợp lệ"
+            );
+        }
+
+
         console.log(
-            "[CyberGuard]",
+            "CyberGuard:",
             domain,
             "malicious =",
             malicious
@@ -124,95 +121,87 @@ async function checkWebsite()
 
 
         /*
-            =========================
-            WEBSITE NGUY HIỂM
-            =========================
-        */
+         * >= 3:
+         * Hiển thị cảnh báo
+         */
 
         if (malicious >= 3)
         {
-            let warning =
+            let warningUrl =
                 chrome.runtime.getURL(
                     "warning.html"
-                );
-
-
-            warning +=
-                "?domain=" +
+                ) +
+                "?url=" +
+                encodeURIComponent(
+                    originalUrl
+                ) +
+                "&domain=" +
                 encodeURIComponent(
                     domain
-                );
-
-
-            warning +=
+                ) +
                 "&malicious=" +
-                encodeURIComponent(
-                    malicious
-                );
+                malicious;
 
 
-            warning +=
-                "&url=" +
-                encodeURIComponent(
-                    originalURL
-                );
-
-
-            window.location.replace(
-                warning
-            );
-
+            window.location.href =
+                warningUrl;
 
             return;
         }
 
 
         /*
-            =========================
-            WEBSITE AN TOÀN
-            =========================
-        */
+         * Website an toàn /
+         * chưa đủ mức cảnh báo
+         */
 
-        status.innerText =
-            "🛡️ Website appears safe.";
+        if (status)
+        {
+            status.innerText =
+                "Website chưa bị phát hiện nguy hiểm.";
+        }
 
 
-        /*
-            Cho phép URL hiện tại
-            đi qua đúng một lần
-        */
+        if (result)
+        {
+            result.innerText =
+                "VirusTotal phát hiện: " +
+                malicious +
+                " engine.";
+        }
 
-        chrome.runtime.sendMessage(
-            {
-                type:
-                    "ALLOW_CURRENT_URL",
 
-                url:
-                    originalURL
-            },
+        setTimeout(
             function()
             {
-                /*
-                    Sau khi background
-                    nhận được quyền bypass
-                    mới chuyển tới website.
-                */
-
-                window.location.replace(
-                    originalURL
-                );
-            }
+                window.location.href =
+                    originalUrl;
+            },
+            500
         );
     }
     catch (error)
     {
-        console.log(
-            "[CyberGuard] Error:",
+        console.error(
+            "CyberGuard error:",
             error
         );
 
 
-        status.innerText =
-            "⚠️ Cannot connect to CyberGuard Backend.";
+        if (status)
+        {
+            status.innerText =
+                "Không thể kết nối CyberGuard.";
+        }
+
+
+        if (result)
+        {
+            result.innerText =
+                "Backend có thể đang khởi động. Vui lòng thử lại.";
+        }
     }
 }
+
+
+checkWebsite();
