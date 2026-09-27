@@ -62,22 +62,11 @@ async function checkWebsite()
 
     try
     {
-        let url =
-            BACKEND +
-            encodeURIComponent(domain);
-
-        console.log(
-            "CyberGuard request:",
-            url
-        );
-
         let response =
-            await fetch(url);
-
-        console.log(
-            "HTTP:",
-            response.status
-        );
+            await fetch(
+                BACKEND +
+                encodeURIComponent(domain)
+            );
 
         if (!response.ok)
         {
@@ -90,20 +79,21 @@ async function checkWebsite()
         let data =
             await response.json();
 
-        console.log(
-            "CyberGuard response:",
-            data
-        );
-
         let malicious =
             Number(data.malicious);
 
         if (Number.isNaN(malicious))
         {
             throw new Error(
-                "Invalid malicious value"
+                "Kết quả không hợp lệ"
             );
         }
+
+        console.log(
+            "CyberGuard:",
+            domain,
+            malicious
+        );
 
         if (malicious >= 3)
         {
@@ -122,8 +112,9 @@ async function checkWebsite()
                 "&malicious=" +
                 malicious;
 
-            window.location.href =
-                warningUrl;
+            window.location.replace(
+                warningUrl
+            );
 
             return;
         }
@@ -136,13 +127,19 @@ async function checkWebsite()
             malicious +
             " engine.";
 
+        /*
+         * Chờ một chút để người dùng
+         * nhìn thấy kết quả rồi quay lại
+         * website ban đầu.
+         */
         setTimeout(
             function()
             {
-                window.location.href =
-                    originalUrl;
+                window.location.replace(
+                    originalUrl
+                );
             },
-            500
+            1500
         );
     }
     catch (error)
