@@ -1,98 +1,126 @@
-document.getElementById(
-    "scan"
-).addEventListener(
-    "click",
-    async function()
-    {
-        let result =
-            document.getElementById(
-                "result"
-            );
+const BACKEND =
+    "https://cyberguard-jx83.onrender.com/scan?domain=";
 
 
-        result.innerText =
-            "Scanning...";
+const input =
+    document.getElementById("domain");
 
 
-        chrome.tabs.query(
+const button =
+    document.getElementById("check");
+
+
+const result =
+    document.getElementById("result");
+
+
+if (button)
+{
+    button.addEventListener(
+        "click",
+        async function()
+        {
+            let domain =
+                input.value.trim();
+
+
+            if (!domain)
             {
-                active: true,
+                if (result)
+                {
+                    result.innerText =
+                        "Vui lòng nhập tên miền.";
+                }
 
-                currentWindow: true
-            },
+                return;
+            }
 
 
-            async function(tabs)
+            domain =
+                domain
+                    .replace(
+                        "https://",
+                        ""
+                    )
+                    .replace(
+                        "http://",
+                        ""
+                    )
+                    .split("/")[0];
+
+
+            if (result)
             {
+                result.innerText =
+                    "Đang kiểm tra...";
+            }
+
+
+            try
+            {
+                let response =
+                    await fetch(
+                        BACKEND +
+                        encodeURIComponent(
+                            domain
+                        )
+                    );
+
+
+                if (!response.ok)
+                {
+                    throw new Error(
+                        "HTTP " +
+                        response.status
+                    );
+                }
+
+
+                let data =
+                    await response.json();
+
+
+                let malicious =
+                    Number(
+                        data.malicious
+                    );
+
+
                 if (
-                    !tabs[0] ||
-                    !tabs[0].url
+                    malicious >= 3
                 )
                 {
-                    result.innerText =
-                        "Cannot get website.";
-
-                    return;
-                }
-
-
-                try
-                {
-                    let site =
-                        new URL(
-                            tabs[0].url
-                        );
-
-
-                    let domain =
-                        site.hostname;
-
-
-                    let response =
-                        await fetch(
-                            "http://127.0.0.1:8080/scan?domain=" +
-                            encodeURIComponent(
-                                domain
-                            )
-                        );
-
-
-                    let data =
-                        await response.json();
-
-
-                    if (data.error)
+                    if (result)
                     {
                         result.innerText =
-                            data.error;
-
-                        return;
-                    }
-
-
-                    if (
-                        data.malicious >= 3
-                    )
-                    {
-                        result.innerText =
-                            "⚠️ DANGEROUS\n\n" +
-                            "Malicious detections: " +
-                            data.malicious;
-                    }
-                    else
-                    {
-                        result.innerText =
-                            "🛡️ SAFE\n\n" +
-                            "Malicious detections: " +
-                            data.malicious;
+                            "⚠️ Cảnh báo: " +
+                            malicious +
+                            " engine phát hiện nguy hiểm.";
                     }
                 }
-                catch (error)
+                else
                 {
-                    result.innerText =
-                        "Cannot connect to CyberGuard Backend.";
+                    if (result)
+                    {
+                        result.innerText =
+                            "✅ Chưa phát hiện nguy hiểm. " +
+                            malicious +
+                            " engine.";
+                    }
                 }
             }
-        );
-    }
-);
+            catch (error)
+            {
+                console.error(
+                    error
+                );
+
+                if (result)
+                {
+                    result.innerText =
+                        "❌ Không thể kết nối backend.";
+                }
+            }
+        }
+    );
+}
